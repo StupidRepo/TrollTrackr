@@ -4,7 +4,8 @@ namespace TrollTrackr.Models;
 
 public class Troll
 {
-	[BsonId] public string UserId { get; set; }
+	[BsonId] public string TrollId { get; set; }
+	[BsonElement("user_id")] public string UserId { get; set; }
 	
 	[BsonElement("name")] public string Name { get; set; }
 	

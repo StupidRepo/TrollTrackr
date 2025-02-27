@@ -47,12 +47,12 @@ public class TrollCommands : ModuleBase
 	 * Gets a troll from the DB.
 	 */
 	[Command("getTroll")]
-	public async Task GetTrollAsync([Remainder] string userId)
+	public async Task GetTrollAsync(string trollId)
 	{
 		var message = await ReplyAsync(Utils.MakeEmojiSentence(Emojis.Processing, "Getting troll from DB...").Value);
 		
 		// Get troll from DB
-		var troll = await Program.DatabaseHandler?.TrollCollection?.Find(troll => troll.UserId == userId).FirstOrDefaultAsync();
+		var troll = await Program.DatabaseHandler?.TrollCollection?.Find(troll => troll.TrollId == trollId).FirstOrDefaultAsync();
 		if (troll == null)
 		{
 			await message.EditMessageAsync(Utils.MakeEmojiSentence(Emojis.Error, "Troll not found in DB.")!);
@@ -82,7 +82,7 @@ public class TrollCommands : ModuleBase
 			return;
 		}
 		
-		// Get user by ID
+		// Get user by mention
 		var user = await Context?.Client.Rest.GetUserAsync(mentions[0]);
 		if (user == null)
 		{
@@ -90,11 +90,20 @@ public class TrollCommands : ModuleBase
 			return;
 		}
 		
+		// Check if user already exists by ID
+		var trollExists = await Program.DatabaseHandler?.TrollCollection?.Find(troll => troll.UserId == user.Id).AnyAsync();
+		if (trollExists)
+		{
+			await message.EditMessageAsync(Utils.MakeEmojiSentence(Emojis.Error, $"{user.CurrentName} already exists in DB.")!);
+			return;
+		}
+		
 		// Add troll to DB
 		try
 		{
-			await Program.DatabaseHandler?.TrollCollection?.InsertOneAsync(new Troll
+			var troll = new Troll
 			{
+				TrollId = Utils.GenerateId(user),
 				UserId = user.Id,
 				Name = user.CurrentName,
 
@@ -102,8 +111,9 @@ public class TrollCommands : ModuleBase
 				Reason = "[no reason provided yet]",
 				
 				AddedByID = Context.User.Id
-			})!;
-			await message.EditMessageAsync(Utils.MakeEmojiSentence(Emojis.Trolled, $"Added {user.CurrentName} to DB. Run `{Context.Prefix}reason {user.Id} [reason]` to attach a reason.")!);
+			};
+			await Program.DatabaseHandler?.TrollCollection?.InsertOneAsync(troll)!;
+			await message.EditMessageAsync(Utils.MakeEmojiSentence(Emojis.Trolled, $"Added {user.CurrentName} to DB.\nTroll ID: {troll.TrollId}\nRun `{Context.Prefix}reason {troll.TrollId} [reason]` to attach a reason.")!);
 		}
 		catch (MongoWriteException)
 		{
@@ -115,36 +125,28 @@ public class TrollCommands : ModuleBase
 	 * Removes a troll from the DB.
 	 */
 	[Command("removeTroll")]
-	public async Task RemoveTrollAsync(string userId)
+	public async Task RemoveTrollAsync(string trollId)
 	{
 		var message = await ReplyAsync(Utils.MakeEmojiSentence(Emojis.Processing, "Removing troll from DB...").Value);
 		
-		// Get user by ID
-		var user = await Context?.Client.Rest.GetUserAsync(userId);
-		if (user == null)
-		{
-			await message.EditMessageAsync(Utils.MakeEmojiSentence(Emojis.Error, "User not found.")!);
-			return;
-		}
-		
 		// Remove troll from DB
-		var result = await Program.DatabaseHandler?.TrollCollection?.DeleteOneAsync(troll => troll.UserId == user.Id);
+		var result = await Program.DatabaseHandler?.TrollCollection?.DeleteOneAsync(troll => troll.TrollId == trollId);
 		if (result?.DeletedCount == 0)
 		{
-			await message.EditMessageAsync(Utils.MakeEmojiSentence(Emojis.Error, $"{user.CurrentName} not found in DB.")!);
+			await message.EditMessageAsync(Utils.MakeEmojiSentence(Emojis.Error, $"{trollId} not found in DB.")!);
 			return;
 		}
 		
-		await message.EditMessageAsync(Utils.MakeEmojiSentence(Emojis.Success, $"Removed {user.CurrentName} from DB.")!);
+		await message.EditMessageAsync(Utils.MakeEmojiSentence(Emojis.Success, "Removed troll from DB.")!);
 	}
 
 	[Command("reason")]
-	public async Task UpdateTrollReason(string userId, [Remainder] string reason)
+	public async Task UpdateTrollReason(string trollId, [Remainder] string reason)
 	{
 		var message = await ReplyAsync(Utils.MakeEmojiSentence(Emojis.Processing, "Updating troll reason in DB...").Value);
 		
 		// Get troll by ID
-		var troll = await Program.DatabaseHandler?.TrollCollection?.Find(troll => troll.UserId == userId).FirstOrDefaultAsync();
+		var troll = await Program.DatabaseHandler?.TrollCollection?.Find(troll => troll.TrollId == trollId).FirstOrDefaultAsync();
 		if (troll == null)
 		{
 			await message.EditMessageAsync(Utils.MakeEmojiSentence(Emojis.Error, "Troll not found in DB.")!);
@@ -153,7 +155,7 @@ public class TrollCommands : ModuleBase
 		
 		// Update troll reason in DB
 		var update = Builders<Troll>.Update.Set(t => t.Reason, reason);
-		await Program.DatabaseHandler?.TrollCollection?.UpdateOneAsync(t => t.UserId == userId, update);
+		await Program.DatabaseHandler?.TrollCollection?.UpdateOneAsync(t => t.TrollId == trollId, update);
 		
 		await message.EditMessageAsync(Utils.MakeEmojiSentence(Emojis.Success, "Updated troll reason in DB.")!);
 	}

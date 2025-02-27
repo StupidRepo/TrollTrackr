@@ -2,6 +2,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Text.Json.Serialization;
 using Humanizer;
+using MongoDB.Driver;
 using RevoltSharp;
 using RevoltSharp.Commands;
 using TrollTrackr.Extensions;
@@ -31,7 +32,7 @@ namespace TrollTrackr
 				addedByUser = await Program.Client?.Rest.GetUserAsync(troll.AddedByID);
 			
 			sb.Append($"### {troll.Name} - <t:{troll.Date.ToUnixTimestamp()}:R>\n");
-			sb.Append($"**User ID:** {troll.UserId}\n");
+			sb.Append($"**User ID:** {troll.UserId} • **Troll ID**: {troll.TrollId}\n");
 			sb.Append($"**Reason:** {troll.Reason}\n");
 			sb.Append($"**Added by:** {addedByUser?.CurrentName ?? "Unknown"}");
 
@@ -48,6 +49,15 @@ namespace TrollTrackr
 		public static bool IsOwnerOrHasPermission(CommandContext context, ServerPermission permission)
 		{
 			return IsOwner(context) || context.Member.Permissions.Has(permission);
+		}
+
+		public static string GenerateId(User user)
+		{
+			var sb = new StringBuilder();
+			sb.Append(Program.DatabaseHandler?.TrollCollection?.CountDocuments(FilterDefinition<Troll>.Empty)+1 ?? 0);
+			sb.Append(user.Id.TakeLast(4).ToArray());
+			
+			return sb.ToString();
 		}
 	}
 }
