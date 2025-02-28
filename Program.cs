@@ -22,7 +22,7 @@ internal class Program
 	{
 		Client = new RevoltClient(ClientMode.WebSocket, new ClientConfig
 		{
-			ApiUrl = "https://api.revolt.chat",
+			// ApiUrl = "https://api.revolt.chat",
 			Owners = ["01JMV4KTP06D5EPAKHTTCQ2XRH"]
 		});
 		
